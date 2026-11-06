@@ -11,27 +11,27 @@ env:
   IMAGE_NAME: react-app
 
 jobs:
-  build-and-push:
+  build-and-run:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Get source code
+      # 1. Checkout source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Login to Docker Hub
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # 3. Build Docker image
+      # 2. Build Docker image
       - name: Build Docker image
         run: |
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest \
             ./react-app
+
+      # 3. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # 4. Push image to Docker Hub
       - name: Push Docker image
@@ -39,6 +39,32 @@ jobs:
           docker push \
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
-      # 5. Verify image
-      - name: Check Docker image
-        run: docker images
+      # 5. Remove locally built image
+      - name: Remove local image
+        run: |
+          docker rmi \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+      # 6. Pull image from Docker Hub
+      - name: Pull Docker image
+        run: |
+          docker pull \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+      # 7. Run container with port mapping
+      - name: Run Docker container
+        run: |
+          docker run -d \
+            --name react-app \
+            -p 8080:80 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+      # 8. Test application
+      - name: Test application
+        run: |
+          curl --fail --retry 10 --retry-connrefused \
+            --retry-delay 2 http://localhost:8080
+
+      # 9. Check running container
+      - name: Check container
+        run: docker ps
